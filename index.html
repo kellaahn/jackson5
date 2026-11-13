@@ -2,20 +2,24 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Punch AR Mirror</title>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    /* 화면 크기에 따라 전체 글자/이펙트 크기 자동 조절 (폰 ~9px, PC 16px) */
+    html { font-size: clamp(9px, 2.3vmin, 16px); }
     body, html {
-      width: 100vw; height: 100vh; overflow: hidden;
+      width: 100%; height: 100vh; height: 100dvh; overflow: hidden;
+      overscroll-behavior: none; touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
       background: #111; font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
     }
 
     /* 전체 화면 웹캠 배경 (거울 반전) */
     #webcam {
-      position: fixed; inset: 0; width: 100vw; height: 100vh;
+      position: fixed; inset: 0; width: 100%; height: 100%;
       object-fit: cover; transform: scaleX(-1); z-index: 1;
     }
 
@@ -33,14 +37,15 @@
       pointer-events: none;
     }
     #target-wrap {
-      position: relative; height: 78vh;
+      position: relative; height: 78vh; height: 78dvh;
+      max-width: 100vw; padding-bottom: env(safe-area-inset-bottom);
       display: flex; align-items: flex-end; justify-content: center;
       transform-origin: bottom center;
       transition: transform 0.08s cubic-bezier(0.2, 1.6, 0.4, 1);
       pointer-events: auto; cursor: pointer;
     }
     #target-img {
-      height: 100%; width: auto; object-fit: contain;
+      height: 100%; width: auto; max-width: 100%; object-fit: contain; object-position: bottom;
       filter: drop-shadow(0 16px 32px rgba(0,0,0,0.55));
     }
 
@@ -78,7 +83,7 @@
 
     /* 연타 콤보 카운터 */
     #combo {
-      position: fixed; top: 6vh; left: 50%; z-index: 6; pointer-events: none;
+      position: fixed; top: calc(6vh + env(safe-area-inset-top)); left: 50%; z-index: 6; pointer-events: none;
       transform: translateX(-50%);
       font-size: 3rem; font-weight: 900; font-style: italic; color: #fff;
       letter-spacing: -1px; white-space: nowrap;
@@ -114,7 +119,7 @@
       display: flex; align-items: center; justify-content: center;
     }
     #start-btn {
-      padding: 22px 48px; font-size: 1.7rem; font-weight: 900;
+      padding: 20px 44px; font-size: clamp(1.3rem, 5vw, 1.7rem); font-weight: 900;
       color: #fff; background: #ff1744; border: none; border-radius: 999px;
       box-shadow: 0 12px 32px rgba(255, 23, 68, 0.55);
       cursor: pointer; transition: transform 0.15s ease;
@@ -225,10 +230,15 @@
       }
     }
 
+    // 화면 크기 배율 (짧은 변 700px 이상이면 1, 폰이면 ~0.5)
+    function fxScale() {
+      return Math.min(1, Math.min(window.innerWidth, window.innerHeight) / 700);
+    }
+
     // 화면 전체 흔들림
     function shakeScreen(p) {
       if (p <= 0) return;
-      const a = 6 + p * 22;
+      const a = (6 + p * 22) * fxScale();
       document.body.animate([
         { transform: 'translate(0,0)' },
         { transform: `translate(${-a}px, ${a * 0.6}px)` },
@@ -246,12 +256,12 @@
         const s = document.createElement('div');
         s.className = 'fx-spark';
         const ang = Math.random() * Math.PI * 2;
-        const r = 80 + Math.random() * (120 + p * 200);
+        const r = (80 + Math.random() * (120 + p * 200)) * fxScale();
         s.style.left = `${x}%`;
         s.style.top = `${y}%`;
         s.style.setProperty('--dx', `${Math.cos(ang) * r}px`);
         s.style.setProperty('--dy', `${Math.sin(ang) * r}px`);
-        const size = 8 + Math.random() * (8 + p * 14);
+        const size = (8 + Math.random() * (8 + p * 14)) * Math.max(0.6, fxScale());
         s.style.width = s.style.height = `${size}px`;
         document.body.appendChild(s);
         setTimeout(() => s.remove(), 460);
@@ -280,7 +290,7 @@
 
       // 캐릭터 밀려나는 모션 (콤보가 높을수록 크게)
       const dir = side === 'Left' ? 1 : side === 'Right' ? -1 : (Math.random() > 0.5 ? 1 : -1);
-      const push = 52 + p * 70;
+      const push = (52 + p * 70) * fxScale();
       const rot = 13 + p * 15;
       targetWrap.style.transform =
         `translateX(${dir * push}px) rotate(${dir * rot}deg) scale(${0.91 - p * 0.08}, ${1.06 + p * 0.08})`;
@@ -323,8 +333,8 @@
     targetWrap.addEventListener('pointerdown', () => triggerHit('Center'));
 
     // 3D 거리 (x는 화면 비율 보정)
-    const ASPECT = 1280 / 720;
     function dist(a, b) {
+      const ASPECT = (video.videoWidth && video.videoHeight) ? video.videoWidth / video.videoHeight : 16 / 9;
       const dx = (a.x - b.x) * ASPECT, dy = a.y - b.y, dz = (a.z - b.z) * ASPECT;
       return Math.hypot(dx, dy, dz);
     }
@@ -349,13 +359,16 @@
       return dist(lm[0], lm[9]);
     }
 
+    const IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+
     // MediaPipe Hands 설정 (양손 독립 인식)
     const hands = new Hands({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
     });
     hands.setOptions({
       maxNumHands: 2,
-      modelComplexity: 1,
+      modelComplexity: IS_MOBILE ? 0 : 1,
       minDetectionConfidence: 0.5,
       minTrackingConfidence: 0.5
     });
@@ -435,8 +448,13 @@
         onFrame: async () => {
           await hands.send({ image: video });
         },
-        width: 1280,
-        height: 720
+        // 세로 화면이면 세로 해상도로 요청, 폰은 가볍게
+        ...(() => {
+          const portrait = window.innerHeight > window.innerWidth;
+          const [w, h] = IS_MOBILE ? [640, 480] : [1280, 720];
+          return portrait ? { width: h, height: w } : { width: w, height: h };
+        })(),
+        facingMode: 'user'
       });
       camera.start();
     });
